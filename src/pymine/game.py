@@ -239,6 +239,8 @@ def clamp(value: float, min_value: float, max_value: float) -> float:
 def move_player(world, player: PlayerState, dt: float) -> None:
     """Move the player while preventing them from entering solid tiles."""
 
+    _update_player_stance(world, player)
+
     # Horizontal movement
     player.position[0] += player.velocity[0] * dt
     if player.velocity[0] > 0:
@@ -308,6 +310,49 @@ def build_crosshair(
     return target_x, target_y
 
 
+def _area_intersects_solid(world, left: float, top: float, width: float, height: float) -> bool:
+    x_start = int(math.floor(left / BLOCK_SIZE))
+    x_end = int((left + width - 1) // BLOCK_SIZE)
+    y_start = int(math.floor(top / BLOCK_SIZE))
+    y_end = int((top + height - 1) // BLOCK_SIZE)
+    for tile_x in range(x_start, x_end + 1):
+        for tile_y in range(y_start, y_end + 1):
+            if world.is_solid(tile_x, tile_y):
+                return True
+    return False
+
+
+def _update_player_stance(world, player: PlayerState) -> None:
+    """Ensure the player's collision box matches their crouch state."""
+
+    target_height = (
+        player.crouching_height if player.crouching else player.standing_height
+    )
+    assert target_height is not None
+
+    # Nothing to do if already using the desired hitbox size.
+    if abs(player.height - target_height) < 1e-5:
+        return
+
+    bottom = player.position[1] + player.height
+
+    if target_height < player.height:
+        # Shrinking simply lowers the top edge while keeping the feet planted.
+        player.height = target_height
+        player.position[1] = bottom - player.height
+        return
+
+    # Standing back up requires checking that the taller hitbox has clearance.
+    new_top = bottom - target_height
+    if _area_intersects_solid(world, player.position[0], new_top, player.width, target_height):
+        # Not enough headroom—force the crouch state to persist.
+        player.crouching = True
+        return
+
+    player.height = target_height
+    player.position[1] = new_top
+
+
 def block_rect(block_pos: Tuple[int, int]) -> pygame.Rect:
     return pygame.Rect(block_pos[0] * BLOCK_SIZE, block_pos[1] * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE)
 
@@ -370,7 +415,7 @@ def main() -> None:
         dt = clock.tick(60) / 1000.0
 
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
+            if event.type in {pygame.QUIT, pygame.WINDOWCLOSE}:
                 running = False
             elif event.type == pygame.KEYDOWN:
                 if pygame.K_1 <= event.key <= pygame.K_5:

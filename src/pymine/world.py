@@ -277,9 +277,21 @@ class PlayerState:
     velocity: List[float]
     width: float
     height: float
+    standing_height: float | None = None
+    crouching_height: float | None = None
     on_ground: bool = False
     crouching: bool = False
     flight_mode: bool = False
+
+    def __post_init__(self) -> None:
+        # Preserve the original constructor signature where ``height`` defined the
+        # standing collision size.  The crouching height defaults to a gentle
+        # squeeze so the player still feels responsive while ducking under
+        # blocks.
+        if self.standing_height is None:
+            self.standing_height = self.height
+        if self.crouching_height is None:
+            self.crouching_height = self.standing_height * 0.6
 
     def rect(self) -> Tuple[float, float, float, float]:
         return (*self.position, self.width, self.height)
