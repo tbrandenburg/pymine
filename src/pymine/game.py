@@ -145,13 +145,25 @@ def draw_world(surface: pygame.Surface, world, camera_x: float, camera_y: float)
 def draw_player(
     surface: pygame.Surface, player: PlayerState, theme: Theme, camera_x: float, camera_y: float
 ) -> None:
+    standing_height = player.standing_height or player.height
+    crouch_ratio = clamp(player.height / standing_height, 0.0, 1.0)
+
+    width_scale = 1.0 + (1.0 - crouch_ratio) * 0.35
+    pill_width = player.width * width_scale
+    pill_height = player.height
+    bottom = player.position[1] + player.height
+    left = (player.position[0] + player.width / 2) - pill_width / 2
+    top = bottom - pill_height
+
     rect = pygame.Rect(
-        int(player.position[0] - camera_x),
-        int(player.position[1] - camera_y),
-        int(player.width),
-        int(player.height),
+        int(round(left - camera_x)),
+        int(round(top - camera_y)),
+        int(round(pill_width)),
+        int(round(pill_height)),
     )
-    pygame.draw.rect(surface, theme.player_color, rect, border_radius=4)
+
+    border_radius = max(4, int(round(min(rect.width, rect.height) * (0.35 + 0.25 * (1.0 - crouch_ratio)))))
+    pygame.draw.rect(surface, theme.player_color, rect, border_radius=border_radius)
 
 
 def draw_crosshair(
