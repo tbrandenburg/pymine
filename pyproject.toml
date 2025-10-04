@@ -1,0 +1,23 @@
+[project]
+name = "pymine"
+version = "0.1.0"
+description = "A colourful 2D Minecraft / Super Mario inspired sandbox built with pygame."
+authors = [
+  { name = "OpenAI Assistant" }
+]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "pygame>=2.5.0"
+]
+
+[project.scripts]
+pymine = "pymine.game:main"
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+addopts = "-ra"
