@@ -1,5 +1,7 @@
 # pymine
 
+<img width="1038" height="820" alt="grafik" src="https://github.com/user-attachments/assets/4530e242-a8ce-41e1-a9aa-e2aecf11583f" />
+
 A colourful 2D Minecraft / Super Mario inspired sandbox built with
 pygame.  The codebase is intentionally compact, extensively commented and
 split into a pygame free logic layer so Python beginners can experiment
