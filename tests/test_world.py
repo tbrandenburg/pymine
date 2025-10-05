@@ -1,8 +1,13 @@
 """Tests for the pygame independent mechanics."""
 
+import math
+
 import pytest
 
 from pymine import world
+
+
+BLOCK_SIZE = 24
 
 
 def test_inventory_selection():
@@ -177,3 +182,77 @@ def test_build_palette_hues_are_distinct():
     for block in default_palette + warm_palette:
         for channel in block.color:
             assert 0 <= channel <= 255
+
+
+def _player_intersects_solid(test_world, player) -> bool:
+    x_start = int(math.floor(player.position[0] / BLOCK_SIZE))
+    x_end = int(math.floor((player.position[0] + player.width - 1) / BLOCK_SIZE))
+    y_start = int(math.floor(player.position[1] / BLOCK_SIZE))
+    y_end = int(math.floor((player.position[1] + player.height - 1) / BLOCK_SIZE))
+    for tile_x in range(x_start, x_end + 1):
+        for tile_y in range(y_start, y_end + 1):
+            if test_world.is_solid(tile_x, tile_y):
+                return True
+    return False
+
+
+def test_place_player_on_surface_drops_to_ground():
+    palette = world.build_palette()
+    terrain = world.create_prebuilt_world(40, 30, palette)
+    spawn_column = 15
+    player = world.PlayerState(
+        position=[BLOCK_SIZE * spawn_column, BLOCK_SIZE * 3.0],
+        velocity=[0.0, 0.0],
+        width=BLOCK_SIZE * 0.6,
+        height=BLOCK_SIZE * 0.9,
+    )
+
+    world.place_player_on_surface(terrain, player, block_size=BLOCK_SIZE)
+
+    assert player.on_ground is True
+    assert not _player_intersects_solid(terrain, player)
+    support_tile = int((player.position[1] + player.height) // BLOCK_SIZE)
+    x_start = int(math.floor(player.position[0] / BLOCK_SIZE))
+    x_end = int(math.floor((player.position[0] + player.width - 1) / BLOCK_SIZE))
+    assert all(terrain.is_solid(tile_x, support_tile) for tile_x in range(x_start, x_end + 1))
+
+
+def test_place_player_on_surface_clears_embedded_spawn():
+    palette = world.build_palette()
+    terrain = world.create_prebuilt_world(40, 30, palette)
+    player_height = BLOCK_SIZE * 0.9
+    spawn_y = terrain.horizon * BLOCK_SIZE - player_height
+    player = world.PlayerState(
+        position=[BLOCK_SIZE * 6.0, spawn_y - BLOCK_SIZE * 0.25],
+        velocity=[0.0, 0.0],
+        width=BLOCK_SIZE * 0.6,
+        height=player_height,
+    )
+
+    player.position[1] += BLOCK_SIZE * 0.5
+    assert _player_intersects_solid(terrain, player)
+
+    world.place_player_on_surface(terrain, player, block_size=BLOCK_SIZE)
+
+    assert player.on_ground is True
+    assert not _player_intersects_solid(terrain, player)
+
+
+def test_place_player_on_surface_handles_missing_support():
+    palette = world.build_palette()
+    terrain = world.create_prebuilt_world(40, 30, palette)
+    column_x = 25
+    for depth in range(terrain.top, terrain.bottom + 1):
+        terrain.set(column_x, depth, None)
+
+    player = world.PlayerState(
+        position=[BLOCK_SIZE * column_x, BLOCK_SIZE * 4.0],
+        velocity=[0.0, 0.0],
+        width=BLOCK_SIZE * 0.6,
+        height=BLOCK_SIZE * 0.9,
+    )
+
+    world.place_player_on_surface(terrain, player, block_size=BLOCK_SIZE)
+
+    assert player.on_ground is False
+    assert not _player_intersects_solid(terrain, player)

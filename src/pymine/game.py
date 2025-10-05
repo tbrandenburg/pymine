@@ -21,6 +21,7 @@ from .world import (
     PlayerState,
     build_palette,
     create_prebuilt_world,
+    place_player_on_surface,
     within_build_radius,
 )
 
@@ -412,6 +413,7 @@ def main() -> None:
     world = create_prebuilt_world(WORLD_WIDTH, WORLD_HEIGHT, palette)
 
     player = PlayerState(position=[BLOCK_SIZE * 3.0, BLOCK_SIZE * 10.0], velocity=[0.0, 0.0], width=BLOCK_SIZE * 0.6, height=BLOCK_SIZE * 0.9)
+    place_player_on_surface(world, player, block_size=BLOCK_SIZE)
 
     fonts = {
         "hud": pygame.font.SysFont("arial", 18),

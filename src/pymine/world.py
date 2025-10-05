@@ -13,6 +13,8 @@ import random
 from dataclasses import dataclass, field
 from typing import Dict, Iterable, List, Optional, Tuple
 
+import math
+
 
 @dataclass(frozen=True)
 class BlockType:
@@ -368,11 +370,99 @@ def within_build_radius(player_block: Tuple[int, int], target_block: Tuple[int, 
     return max(dx, dy) <= radius
 
 
+def _area_contains_solid(
+    world, left: float, top: float, width: float, height: float, block_size: float
+) -> bool:
+    """Return ``True`` when any solid tile overlaps the given rectangle."""
+
+    if width <= 0 or height <= 0:
+        return False
+
+    x_start = int(math.floor(left / block_size))
+    x_end = int(math.floor((left + width - 1) / block_size))
+    y_start = int(math.floor(top / block_size))
+    y_end = int(math.floor((top + height - 1) / block_size))
+
+    for tile_x in range(x_start, x_end + 1):
+        for tile_y in range(y_start, y_end + 1):
+            if world.is_solid(tile_x, tile_y):
+                return True
+    return False
+
+
+def place_player_on_surface(
+    world,
+    player: PlayerState,
+    *,
+    block_size: float,
+    max_vertical_search: int | None = None,
+) -> None:
+    """Snap the player to a safe position with support beneath their feet."""
+
+    left = player.position[0]
+    width = player.width
+    height = player.height
+
+    x_start = int(math.floor(left / block_size))
+    x_end = int(math.floor((left + width - 1) / block_size))
+    if x_end < x_start:
+        x_end = x_start
+
+    column_width = x_end - x_start + 1
+    if hasattr(world, "ensure_range"):
+        world.ensure_range(x_start, column_width)
+
+    world_top = getattr(world, "top", 0)
+    world_bottom = getattr(world, "bottom", None)
+    if world_bottom is None:
+        world_height = getattr(world, "height", 0)
+        world_bottom = world_top + max(world_height - 1, 0)
+
+    if max_vertical_search is None:
+        max_vertical_search = max(1, world_bottom - world_top + 1)
+
+    if hasattr(world, "ensure_vertical_range"):
+        start_y = int(math.floor(player.position[1] / block_size)) - max_vertical_search
+        world.ensure_vertical_range(start_y, max_vertical_search * 2 + 1)
+
+    # If the spawn point is obstructed, nudge the player upward until clear.
+    attempts = 0
+    while _area_contains_solid(world, left, player.position[1], width, height, block_size):
+        player.position[1] -= block_size
+        attempts += 1
+        if attempts >= max_vertical_search:
+            break
+
+    # Search downward for the first solid tile that can support the player.
+    bottom_tile = int(math.floor((player.position[1] + height - 1) / block_size))
+    search_limit = min(world_bottom, bottom_tile + max_vertical_search)
+    for tile_y in range(bottom_tile, search_limit + 1):
+        top_y = tile_y * block_size - height
+        if _area_contains_solid(world, left, top_y, width, height, block_size):
+            continue
+        if all(world.is_solid(tile_x, tile_y) for tile_x in range(x_start, x_end + 1)):
+            player.position[1] = top_y
+            player.velocity[1] = 0.0
+            player.on_ground = True
+            return
+
+    # Ensure the starting position remains in empty space even without support.
+    attempts = 0
+    while _area_contains_solid(world, left, player.position[1], width, height, block_size):
+        player.position[1] -= block_size
+        attempts += 1
+        if attempts >= max_vertical_search:
+            break
+
+    player.on_ground = False
+
+
 __all__ = [
     "BlockPalette",
     "BlockType",
     "Inventory",
     "PlayerState",
+    "place_player_on_surface",
     "WorldGrid",
     "InfiniteWorld",
     "build_palette",
